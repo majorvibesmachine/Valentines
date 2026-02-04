@@ -10,6 +10,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const [partnerId, _setPartnerId] = useState<string | null>(null);
     const [phase, setLocalPhase] = useState<GamePhase>(GamePhase.LOBBY);
+    const [toastState, setToastState] = useState<Record<string, number>>({});
 
     useEffect(() => {
         if (!roomId) return;
@@ -19,6 +20,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const data = snapshot.val();
             if (data) {
                 if (data.phase) setLocalPhase(data.phase);
+                if (data.toast) setToastState(data.toast);
             }
         });
 
@@ -34,8 +36,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await set(ref(db, `rooms/${roomId}/phase`), newPhase);
     };
 
+    const updateFill = async (fill: number) => {
+        if (!roomId || !userId) return;
+        await set(ref(db, `rooms/${roomId}/toast/${userId}`), fill);
+    };
+
     return (
-        <GameContext.Provider value={{ userId, roomId, partnerId, phase, joinRoom, setPhase }}>
+        <GameContext.Provider value={{ userId, roomId, partnerId, phase, toastState, joinRoom, setPhase, updateFill }}>
             {children}
         </GameContext.Provider>
     );
