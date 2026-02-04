@@ -24,19 +24,27 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
         }
 
         const animate = (time: number) => {
-            if (fillRef.current >= 100) {
+            // Allow overfill (spilling) up to 130%
+            if (fillRef.current >= 130) {
+                // Spilled! Reset.
                 setIsPouring(false);
+                fillRef.current = 0;
+                setCurrentFill(0);
+                updateFill(0);
                 return;
             }
 
             // Fill speed: ~20% per second
-            const increment = 0.4;
-            fillRef.current = Math.min(100, fillRef.current + increment);
+            // Add initial burst for immediate feedback
+            const baseIncrement = 0.4;
+            const increment = fillRef.current < 5 ? 1.5 : baseIncrement;
+
+            fillRef.current = fillRef.current + increment;
             setCurrentFill(fillRef.current);
 
             // Throttle updates
             if (time - lastUpdateRef.current > 200) {
-                updateFill(fillRef.current);
+                updateFill(Math.min(100, fillRef.current)); // Only sync up to 100 to partner
                 lastUpdateRef.current = time;
             }
 
