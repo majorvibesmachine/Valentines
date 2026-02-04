@@ -4,7 +4,7 @@ import { useGlassFill } from '../hooks/useGlassFill';
 import { GamePhase } from '../types';
 
 export const ToastPhase: React.FC = () => {
-    const { userId, toastState, updateFill, setPhase } = useGameContext();
+    const { userId, toastState, penaltyState, updateFill, updatePenaltyState, setPhase } = useGameContext();
 
     // Get partner's ID (anyone who isn't me)
     const partnerId = Object.keys(toastState).find(id => id !== userId);
@@ -24,19 +24,27 @@ export const ToastPhase: React.FC = () => {
     // Partner's fill level
     const partnerFill = partnerId ? (toastState[partnerId] || 0) : 0;
 
-    const isFull = myFill >= 95; // More forgiving threshold
+    const isFull = myFill >= 95 && myFill <= 100; // More forgiving threshold
     const isOverflowing = myFill > 100;
-    const isPartnerFull = partnerFill >= 95; // More forgiving threshold
+    const isPartnerFull = partnerFill >= 95 && partnerFill <= 100; // More forgiving threshold
+
+    // One-shot pour mechanic state
+    const [hasPoured, setHasPoured] = useState(false);
+    const [showAngryWaiter, setShowAngryWaiter] = useState(false);
+    const myPenalty = penaltyState[userId] || false;
+    const partnerPenalty = partnerId ? (penaltyState[partnerId] || false) : false;
 
     // Bartender Emoji Cycling
     const emojiSets = {
         idle: ['🤵', '🧑\u200d🍳', '👨\u200d🍳'],
         pouring: ['😲', '😮', '👀'],
         full: ['👏', '🎉', '✨'],
-        overflow: ['😱', '😰', '🫣']
+        overflow: ['😱', '😰', '🫣'],
+        angry: ['😡', '😠', '💢']
     };
 
     const getCurrentEmojiSet = () => {
+        if (showAngryWaiter || myPenalty || partnerPenalty) return emojiSets.angry;
         if (isOverflowing) return emojiSets.overflow;
         if (isFull) return emojiSets.full;
         if (isPouring) return emojiSets.pouring;
@@ -59,7 +67,7 @@ export const ToastPhase: React.FC = () => {
         }, 800);
 
         return () => clearInterval(interval);
-    }, [isPouring, isFull, isOverflowing]);
+    }, [isPouring, isFull, isOverflowing, showAngryWaiter, myPenalty, partnerPenalty]);
 
     const bartenderEmoji = currentEmojiSet[emojiIndex];
 
@@ -82,6 +90,41 @@ export const ToastPhase: React.FC = () => {
             return () => clearTimeout(timer);
         }
     }, [isFull, isPartnerFull, isOverflowing, setPhase, myFill, partnerFill]);
+
+    // Handle pour start - only allow if haven't poured yet and not penalized
+    const handleStartPour = () => {
+        if (hasPoured || myPenalty) return;
+        setHasPoured(true);
+        startPouring();
+    };
+
+    // Handle pour stop - check for early release penalty
+    const handleStopPour = () => {
+        stopPouring();
+
+        // If released before reaching 95% (and not already overflowing), trigger penalty
+        if (hasPoured && myFill < 95 && !isOverflowing) {
+            triggerPenalty();
+        }
+    };
+
+    // Trigger penalty: angry waiter, reset both glasses
+    const triggerPenalty = () => {
+        setShowAngryWaiter(true);
+        resetFill();
+        updatePenaltyState(true);
+
+        // Hide angry waiter after 2 seconds
+        setTimeout(() => setShowAngryWaiter(false), 2000);
+    };
+
+    // Reset when partner gets penalized
+    useEffect(() => {
+        if (partnerPenalty && !myPenalty) {
+            resetFill();
+            setHasPoured(false);
+        }
+    }, [partnerPenalty, myPenalty, resetFill]);
 
     return (
         <div className="flex h-[100dvh] w-full flex-col items-center justify-around bg-gradient-to-b from-pink-50 to-pink-100 p-4">
@@ -146,21 +189,22 @@ export const ToastPhase: React.FC = () => {
                     </div>
 
                     <button
-                        onMouseDown={isOverflowing ? undefined : startPouring}
-                        onMouseUp={stopPouring}
-                        onMouseLeave={stopPouring}
+                        onMouseDown={isOverflowing ? undefined : handleStartPour}
+                        onMouseUp={handleStopPour}
+                        onMouseLeave={handleStopPour}
                         onTouchStart={(e) => {
                             e.preventDefault();
                             if (isOverflowing) return;
-                            startPouring();
+                            handleStartPour();
                         }}
-                        onTouchEnd={stopPouring}
+                        onTouchEnd={handleStopPour}
                         onClick={isOverflowing ? resetFill : undefined}
+                        disabled={hasPoured && !isOverflowing}
                         className={`rounded-full px-8 py-4 font-bold text-white shadow-lg transition-transform active:scale-90 select-none touch-none
-                            ${isOverflowing ? 'bg-red-500 animate-pulse' : 'bg-pink-500'}
+                            ${isOverflowing ? 'bg-red-500 animate-pulse' : hasPoured || myPenalty ? 'bg-gray-400 cursor-not-allowed' : 'bg-pink-500'}
                         `}
                     >
-                        {isOverflowing ? 'OOPS!' : 'POUR'}
+                        {isOverflowing ? 'OOPS!' : hasPoured || myPenalty ? 'POURED' : 'POUR'}
                     </button>
                 </div>
 
@@ -205,6 +249,17 @@ export const ToastPhase: React.FC = () => {
                         <div className="text-8xl animate-bounce">🥂</div>
                         <h2 className="mt-4 text-4xl font-bold text-pink-600">CHEERS!</h2>
                         <p className="mt-2 text-lg text-gray-600">Perfect Synchronization</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Angry Waiter Penalty Overlay */}
+            {showAngryWaiter && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="animate-in zoom-in slide-in-from-bottom-10 relative rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 p-8 text-center shadow-2xl">
+                        <div className="text-9xl animate-bounce">{bartenderEmoji}</div>
+                        <h2 className="mt-4 text-4xl font-bold text-white drop-shadow-lg">Don't lift your finger!</h2>
+                        <p className="mt-2 text-lg text-white/90">Both glasses reset. Try again!</p>
                     </div>
                 </div>
             )}

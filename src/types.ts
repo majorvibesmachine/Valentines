@@ -17,7 +17,9 @@ export interface GameContextType {
     partnerId: string | null;
     phase: GamePhase;
     toastState: ToastState;
+    penaltyState: Record<string, boolean>;
     joinRoom: (roomId: string) => Promise<void>;
     setPhase: (phase: GamePhase) => Promise<void>;
     updateFill: (fill: number) => Promise<void>;
+    updatePenaltyState: (isPenalized: boolean) => Promise<void>;
 }

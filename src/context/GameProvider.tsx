@@ -11,6 +11,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [partnerId, _setPartnerId] = useState<string | null>(null);
     const [phase, setLocalPhase] = useState<GamePhase>(GamePhase.LOBBY);
     const [toastState, setToastState] = useState<Record<string, number>>({});
+    const [penaltyState, setPenaltyState] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         if (!roomId) return;
@@ -21,6 +22,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (data) {
                 if (data.phase) setLocalPhase(data.phase);
                 if (data.toast) setToastState(data.toast);
+                if (data.penalties) setPenaltyState(data.penalties);
             }
         });
 
@@ -41,8 +43,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await set(ref(db, `rooms/${roomId}/toast/${userId}`), fill);
     };
 
+    const updatePenaltyState = async (isPenalized: boolean) => {
+        if (!roomId || !userId) return;
+        await set(ref(db, `rooms/${roomId}/penalties/${userId}`), isPenalized);
+    };
+
     return (
-        <GameContext.Provider value={{ userId, roomId, partnerId, phase, toastState, joinRoom, setPhase, updateFill }}>
+        <GameContext.Provider value={{ userId, roomId, partnerId, phase, toastState, penaltyState, joinRoom, setPhase, updateFill, updatePenaltyState }}>
             {children}
         </GameContext.Provider>
     );

@@ -12,6 +12,14 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
     const lastUpdateRef = useRef<number>(0);
     const fillRef = useRef(initialFill);
 
+    // Sync external fill changes (from Firebase) to local state
+    useEffect(() => {
+        if (!isPouring && initialFill !== fillRef.current) {
+            fillRef.current = initialFill;
+            setCurrentFill(initialFill);
+        }
+    }, [initialFill, isPouring]);
+
     useEffect(() => {
         if (!isPouring) {
             if (requestRef.current) {
