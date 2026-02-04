@@ -26,11 +26,8 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
         const animate = (time: number) => {
             // Allow overfill (spilling) up to 130%
             if (fillRef.current >= 130) {
-                // Spilled! Reset.
+                // Stop pouring at max overflow
                 setIsPouring(false);
-                fillRef.current = 0;
-                setCurrentFill(0);
-                updateFill(0);
                 return;
             }
 
@@ -42,8 +39,8 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
             fillRef.current = fillRef.current + increment;
             setCurrentFill(fillRef.current);
 
-            // Throttle updates
-            if (time - lastUpdateRef.current > 200) {
+            // Throttle updates - reduced from 200ms to 100ms for better sync
+            if (time - lastUpdateRef.current > 100) {
                 updateFill(Math.min(100, fillRef.current)); // Only sync up to 100 to partner
                 lastUpdateRef.current = time;
             }
@@ -62,7 +59,7 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
     }, [isPouring, updateFill]);
 
     const startPouring = useCallback(() => {
-        if (fillRef.current >= 100) return;
+        if (fillRef.current >= 130) return; // Block if at max overflow
         setIsPouring(true);
     }, []);
 
@@ -70,10 +67,18 @@ export const useGlassFill = ({ updateFill, initialFill = 0 }: UseGlassFillProps)
         setIsPouring(false);
     }, []);
 
+    const resetFill = useCallback(() => {
+        fillRef.current = 0;
+        setCurrentFill(0);
+        updateFill(0);
+        setIsPouring(false);
+    }, [updateFill]);
+
     return {
         currentFill,
         isPouring,
         startPouring,
-        stopPouring
+        stopPouring,
+        resetFill
     };
 };
